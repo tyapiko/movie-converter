@@ -6,9 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import cv2
 
-# 🚨 故意に構文エラーを作成（実験用）
-def broken_function()
-    return "This will cause a syntax error"
+# ✅ 実験完了: GitHub Actionsが構文エラーを正常に検出しました
 
 st.set_page_config(
     page_title="動画編集ツール",
