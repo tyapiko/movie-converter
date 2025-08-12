@@ -94,16 +94,35 @@ def resize_video_to_shorts(video_path, output_path, scale_factor=1.0, start_time
     except FileNotFoundError:
         raise Exception("FFmpegが見つかりません。システムにFFmpegがインストールされていることを確認してください。")
 
-def get_windows_host_ip():
-    """WSLからWindowsホストのIPアドレスを取得"""
+def get_voicevox_url():
+    """VOICEVOX接続URLを取得（環境変数を優先）"""
+    import os
+    
+    # 環境変数から取得（Docker環境で設定）
+    voicevox_url = os.getenv('VOICEVOX_URL')
+    if voicevox_url:
+        return voicevox_url
+    
+    # Docker Compose環境では voicevox サービス名で接続
+    try:
+        # Docker環境かチェック
+        if os.path.exists('/.dockerenv'):
+            return "http://voicevox:50021"
+    except:
+        pass
+    
+    # WSL環境の場合はWindowsホストIPを取得
     try:
         with open('/etc/resolv.conf', 'r') as f:
             for line in f:
                 if line.startswith('nameserver'):
-                    return line.split()[1]
+                    host_ip = line.split()[1]
+                    return f"http://{host_ip}:50021"
     except:
         pass
-    return "localhost"  # フォールバック
+    
+    # フォールバック: localhost
+    return "http://localhost:50021"
 
 def generate_voice_with_voicevox(text, speaker_id=10, output_path=None):
     """VOICEVOXを使用して音声を生成（雨晴はう: speaker_id=10）"""
@@ -114,9 +133,8 @@ def generate_voice_with_voicevox(text, speaker_id=10, output_path=None):
     if output_path is None:
         output_path = tempfile.mktemp(suffix='.wav')
     
-    # WSL環境でWindowsホストのVOICEVOXに接続
-    host_ip = get_windows_host_ip()
-    base_url = f"http://{host_ip}:50021"
+    # 環境に適したVOICEVOX URLを取得
+    base_url = get_voicevox_url()
     
     try:
         # VOICEVOXエンジンの起動確認
