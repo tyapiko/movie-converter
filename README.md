@@ -37,13 +37,16 @@ YouTubeショート向けの縦型動画（9:16）に変換し、テロップや
 ## 🚀 クイックスタート（Docker推奨）
 
 ### 前提条件
-- [Docker](https://www.docker.com/get-started) がインストールされていること
-- [Docker Compose](https://docs.docker.com/compose/install/) がインストールされていること
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) がインストールされていること
+  - **Windows**: Docker Desktop for Windows
+  - **Mac**: Docker Desktop for Mac  
+  - **Linux**: Docker Engine + Docker Compose
+- Git がインストールされていること
 
 ### 1. リポジトリのクローン
 ```bash
-git clone <your-repository-url>
-cd movie
+git clone https://github.com/tyapiko/movie-converter.git
+cd movie-converter
 ```
 
 ### 2. ワンコマンド起動
@@ -58,6 +61,78 @@ docker-compose up -d
 ```bash
 docker-compose down
 ```
+
+## 💻 Windows Desktop での実行手順
+
+### 前提条件の確認
+1. **Docker Desktop** がインストール済みで起動していること
+2. **Git** がインストールされていること（[Git for Windows](https://git-scm.com/download/win)）
+
+### ステップバイステップ手順
+
+#### 1. Git Bash または PowerShell を開く
+```powershell
+# PowerShellの場合
+# Git Bashの場合も同様のコマンド
+```
+
+#### 2. プロジェクトをクローン
+```bash
+git clone https://github.com/tyapiko/movie-converter.git
+cd movie-converter
+```
+
+#### 3. Docker Desktopが起動していることを確認
+```bash
+docker --version
+docker-compose --version
+```
+
+#### 4. アプリケーションを起動
+```bash
+docker-compose up -d
+```
+
+#### 5. ブラウザでアクセス
+- **URL**: http://localhost:8501
+- **Chrome、Edge、Firefox** などのモダンブラウザで開く
+
+#### 6. 使用完了後の停止
+```bash
+# 停止
+docker-compose down
+
+# 完全にクリーンアップ（必要時）
+docker-compose down --volumes --rmi all
+```
+
+### 🔧 Windowsでのトラブルシューティング
+
+#### よくある問題と解決法
+
+**1. Docker Desktopが起動しない**
+- Windows の「サービス」で Docker Desktop Service が実行中か確認
+- 管理者権限で Docker Desktop を再起動
+
+**2. ポート8501が使用中**
+```bash
+# 使用中のプロセスを確認
+netstat -ano | findstr :8501
+
+# 別のポートを使用する場合
+docker-compose up -d --env STREAMLIT_PORT=8502
+```
+
+**3. Git clone でエラー**
+```bash
+# HTTPS接続でエラーの場合
+git config --global http.sslVerify false
+git clone https://github.com/tyapiko/movie-converter.git
+```
+
+**4. メモリ不足エラー**
+- Docker Desktop の設定で **メモリを4GB以上** に設定
+- **Settings** → **Resources** → **Memory**
 
 ## 🛠️ 開発環境セットアップ
 
