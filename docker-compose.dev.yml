@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # 開発用アプリ（ホットリロード対応）
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8501:8501"
+    environment:
+      - VOICEVOX_URL=http://voicevox:50021
+      - STREAMLIT_SERVER_RUNONCAVE=true
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+    volumes:
+      - .:/app  # コード変更をリアルタイム反映
+      - ./tmp:/app/tmp
+      - /app/venv  # 仮想環境は除外
+    depends_on:
+      - voicevox
+    restart: unless-stopped
+    container_name: movie-converter-app-dev
+    command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true --server.runOnSave=true
+
+  # VOICEVOX（開発用も同じ）
+  voicevox:
+    image: voicevox/voicevox_engine:cpu-ubuntu20.04-latest
+    ports:
+      - "50021:50021"
+    restart: unless-stopped
+    container_name: movie-converter-voicevox-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:50021/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# 開発用ボリューム
+volumes:
+  tmp_data_dev:
+    driver: local
+
+# 開発ネットワーク
+networks:
+  default:
+    name: movie-converter-dev-network

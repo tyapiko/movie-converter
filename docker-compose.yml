@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # ショート動画コンバーターアプリ
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - VOICEVOX_URL=http://voicevox:50021
+    volumes:
+      - ./tmp:/app/tmp  # 一時ファイル用
+    depends_on:
+      - voicevox
+    restart: unless-stopped
+    container_name: movie-converter-app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # VOICEVOX音声合成エンジン
+  voicevox:
+    image: voicevox/voicevox_engine:cpu-ubuntu20.04-latest
+    ports:
+      - "50021:50021"
+    restart: unless-stopped
+    container_name: movie-converter-voicevox
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:50021/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# 一時ファイル用のボリューム
+volumes:
+  tmp_data:
+    driver: local
+
+# ネットワーク設定
+networks:
+  default:
+    name: movie-converter-network

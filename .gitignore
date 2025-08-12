@@ -1,0 +1,120 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Streamlit
+.streamlit/
+.streamlit/secrets.toml
+
+# 動画・音声ファイル（一時ファイル）
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.mp3
+*.wav
+*.aac
+*.m4a
+*.ogg
+*.webm
+*.flv
+*.wmv
+
+# 一時ファイル
+tmp/
+temp/
+*.tmp
+*_temp*
+*TEMP*
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Docker
+.dockerignore
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Large files (VOICEVOXなど)
+*.7z
+*.7z.*
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.zip
+voicevox_engine*
+voicevox.tar.gz
+
+# Font files (large)
+# フォントファイルは必要なもののみcommit
+# NotoSansCJK-Regular.ttc
+
+# Test files
+test_*.mp4
+test_*.avi
+sample_*.mp4
+
+# Generated files
+output/
+outputs/
+converted/
+
+# Cache
+.cache/
+.pytest_cache/
+
+# Documentation generated files
+docs/_build/
