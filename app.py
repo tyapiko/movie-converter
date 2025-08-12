@@ -6,6 +6,10 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import cv2
 
+# 🚨 故意に構文エラーを作成（実験用）
+def broken_function()
+    return "This will cause a syntax error"
+
 st.set_page_config(
     page_title="動画編集ツール",
     page_icon="🎬",
