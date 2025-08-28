@@ -1,0 +1,1 @@
+from .voicevox import VoiceVoxClient, voicevox_client

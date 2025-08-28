@@ -1,301 +1,284 @@
-# 🎬 ショート動画コンバーター
+# YouTube Shorts Video Converter
 
-YouTubeショート向けの縦型動画（9:16）に変換し、テロップや音声合成を追加できる総合動画編集ツールです。
+[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://hub.docker.com/)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
 
-[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-%23FE4B4B.svg?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
+🎬 **包括的なStreamlit動画編集ツール** - 縦型動画変換、動画結合、スライド動画生成を一つのアプリケーションで実現
 
-## ✨ 主要機能
+## 🌟 機能概要
 
-### 🎥 ショート動画変換
-- **フォーマット変換**: 1080x1920（9:16）への自動リサイズ
-- **動画トリミング**: 開始・終了時間の指定
-- **拡大倍率調整**: 0.5～5.0倍のズーム機能
-- **高画質出力**: H.264コーデック、8000k bitrate
+### 1. ショート動画変換 📱
+- **9:16フォーマット変換**: 通常の動画をYouTube Shorts形式に自動変換
+- **テキストオーバーレイ**: 時間指定でテロップを追加
+- **VOICEVOX音声合成**: 日本語テキストの自動読み上げ
+- **BGM追加**: 背景音楽の追加と音量調整
+- **高品質出力**: H.264エンコードによる最適化
 
-### 📝 テロップ機能
-- **日本語対応**: NotoSansフォント使用
-- **時間指定**: 表示開始・終了時間の設定
-- **位置調整**: 上部・中央・下部の配置
-- **カラー設定**: 9色のフォントカラー
+### 2. 動画結合 🔗
+- **複数動画統合**: 複数の動画ファイルを順番に結合
+- **異なる解像度対応**: 様々な動画形式・解像度を自動調整
+- **音声トラック保持**: 全ての音声情報を統合
 
-### 🎤 音声合成（VOICEVOX）
-- **雨晴はう**: AIボイスによる読み上げ
-- **複数音声**: 時間差での音声追加
-- **音量調整**: 個別音量コントロール
+### 3. スライド動画作成 📊
+- **PowerPoint変換**: PPTXファイルから動画を自動生成
+- **16:9出力**: プレゼンテーション向け横型フォーマット
+- **歌詞同期**: カラオケ風の歌詞表示機能
+- **カスタム表示時間**: スライドごとの個別時間設定
 
-### 🎵 BGM機能
-- **ループ再生**: 動画長に合わせた自動ループ
-- **音量バランス**: BGMと元音声の音量調整
-- **対応形式**: MP3, WAV, AAC, M4A, OGG
+## 🏗️ アーキテクチャ
 
-### 🔗 動画結合
-- **複数動画**: 任意の数の動画を結合
-- **異なる解像度**: 自動調整機能
+### モジュラー設計（v2.0）
+```
+src/
+├── audio/           # 音声処理（VOICEVOX統合）
+│   ├── __init__.py
+│   └── voicevox.py  # VOICEVOX クライアント
+├── config/          # 設定管理
+│   ├── __init__.py
+│   └── settings.py  # アプリケーション設定
+├── ui/              # UIコンポーネント
+│   ├── __init__.py
+│   └── components.py # 再利用可能なUI要素
+├── utils/           # ユーティリティ関数
+│   ├── __init__.py
+│   └── file_utils.py # ファイル操作
+└── video/           # 動画処理・テキストオーバーレイ
+    ├── __init__.py
+    ├── processor.py     # 動画処理エンジン
+    └── text_overlay.py  # テキスト合成
+```
 
-## 🚀 クイックスタート（Docker推奨）
+### 技術スタック
+- **フロントエンド**: Streamlit (Python Web UI)
+- **動画処理**: MoviePy + FFmpeg
+- **音声合成**: VOICEVOX Engine
+- **画像処理**: PIL (Pillow) + OpenCV
+- **コンテナ**: Docker + Docker Compose
+- **フォント**: Noto Sans CJK (日本語サポート)
+
+## 🚀 クイックスタート
 
 ### 前提条件
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) がインストールされていること
-  - **Windows**: Docker Desktop for Windows
-  - **Mac**: Docker Desktop for Mac  
-  - **Linux**: Docker Engine + Docker Compose
-- Git がインストールされていること
+- Docker & Docker Compose
+- 4GB以上のRAM
+- 10GB以上の空きストレージ
 
-### 1. リポジトリのクローン
+### インストールと起動
+
 ```bash
-git clone https://github.com/tyapiko/movie-converter.git
-cd movie-converter
-```
+# リポジトリをクローン
+git clone <repository-url>
+cd movie
 
-### 2. ワンコマンド起動
-```bash
-docker-compose up -d
-```
-
-### 3. アプリにアクセス
-ブラウザで [http://localhost:8501](http://localhost:8501) を開く
-
-### 4. 停止
-```bash
-docker-compose down
-```
-
-## 💻 Windows Desktop での実行手順
-
-### 前提条件の確認
-1. **Docker Desktop** がインストール済みで起動していること
-2. **Git** がインストールされていること（[Git for Windows](https://git-scm.com/download/win)）
-
-### ステップバイステップ手順
-
-#### 1. Git Bash または PowerShell を開く
-```powershell
-# PowerShellの場合
-# Git Bashの場合も同様のコマンド
-```
-
-#### 2. プロジェクトをクローン
-```bash
-git clone https://github.com/tyapiko/movie-converter.git
-cd movie-converter
-```
-
-#### 3. Docker Desktopが起動していることを確認
-```bash
-docker --version
-docker-compose --version
-```
-
-#### 4. アプリケーションを起動
-```bash
-docker-compose up -d
-```
-
-#### 5. ブラウザでアクセス
-- **URL**: http://localhost:8501
-- **Chrome、Edge、Firefox** などのモダンブラウザで開く
-
-#### 6. 使用完了後の停止
-```bash
-# 停止
-docker-compose down
-
-# 完全にクリーンアップ（必要時）
-docker-compose down --volumes --rmi all
-```
-
-### 🔧 Windowsでのトラブルシューティング
-
-#### よくある問題と解決法
-
-**1. Docker Desktopが起動しない**
-- Windows の「サービス」で Docker Desktop Service が実行中か確認
-- 管理者権限で Docker Desktop を再起動
-
-**2. ポート8501が使用中**
-```bash
-# 使用中のプロセスを確認
-netstat -ano | findstr :8501
-
-# 別のポートを使用する場合
-docker-compose up -d --env STREAMLIT_PORT=8502
-```
-
-**3. Git clone でエラー**
-```bash
-# HTTPS接続でエラーの場合
-git config --global http.sslVerify false
-git clone https://github.com/tyapiko/movie-converter.git
-```
-
-**4. メモリ不足エラー**
-- Docker Desktop の設定で **メモリを4GB以上** に設定
-- **Settings** → **Resources** → **Memory**
-
-## 🛠️ 開発環境セットアップ
-
-### 開発用起動（ホットリロード対応）
-```bash
-# 開発用docker-compose使用
+# 開発環境で起動（ホットリロード有効）
 docker-compose -f docker-compose.dev.yml up -d
 
-# または従来のローカル開発
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-streamlit run app.py
+# または本番環境で起動
+docker-compose up -d
+
+# ブラウザでアクセス
+open http://localhost:8501
 ```
 
-### 環境変数設定
+### 基本的な使用方法
+
+1. **ツール選択**: サイドバーから使用したい機能を選択
+2. **ファイルアップロード**: 対応する形式のファイルをドラッグ&ドロップ
+3. **設定調整**: 各種パラメータをカスタマイズ
+4. **処理実行**: 変換ボタンをクリック
+5. **結果ダウンロード**: 処理完了後にファイルをダウンロード
+
+## 📋 対応形式
+
+### 入力対応形式
+
+| カテゴリ | 対応形式 |
+|----------|----------|
+| 動画 | MP4, AVI, MOV, MKV |
+| 音声 | MP3, WAV, AAC, M4A, OGG |
+| プレゼンテーション | PPTX, PPT |
+
+### 出力形式
+- **動画**: MP4 (H.264 + AAC)
+- **解像度**: 
+  - ショート動画: 1080×1920 (9:16)
+  - スライド動画: 1920×1080 (16:9)
+
+## ⚙️ 設定とカスタマイズ
+
+### 環境変数
 ```bash
-# 環境変数ファイルをコピー
-cp .env.example .env
+# VOICEVOX接続URL（自動検出）
+VOICEVOX_URL=http://voicevox:50021
 
-# 必要に応じて.envを編集
-nano .env
+# 一時ファイル保存先
+TEMP_DIR=/app/tmp
 ```
 
-## 📁 プロジェクト構成
+### パフォーマンスチューニング
+- **メモリ使用量**: 大容量ファイル処理時は8GB推奨
+- **CPU使用**: マルチコア環境で最適化
+- **ストレージ**: SSDでの高速処理
 
+## 🛠️ 開発者向け情報
+
+### プロジェクト構造
 ```
 movie/
-├── app.py                      # メインアプリケーション
-├── Dockerfile                  # 本番用Docker設定
-├── Dockerfile.dev             # 開発用Docker設定
-├── docker-compose.yml         # 本番用Docker Compose
-├── docker-compose.dev.yml     # 開発用Docker Compose
-├── requirements.txt           # Python依存関係
-├── .env.example              # 環境変数テンプレート
-├── .gitignore               # Git除外設定
-├── fonts/                   # フォントファイル
-│   └── NotoSansJP-Regular.ttf
-├── tmp/                     # 一時ファイル（自動生成）
-└── README.md               # このファイル
+├── src/                    # モジュラーコード
+│   ├── audio/             # 音声処理
+│   ├── config/            # 設定管理
+│   ├── ui/                # UIコンポーネント
+│   ├── utils/             # ユーティリティ
+│   └── video/             # 動画処理
+├── app_new.py             # リファクタリング版メイン
+├── app.py                 # レガシー版（互換性維持）
+├── docker-compose.yml     # 本番環境
+├── docker-compose.dev.yml # 開発環境
+├── requirements.txt       # Python依存関係
+└── fonts/                 # 日本語フォント
 ```
 
-## 📋 対応フォーマット
+### 開発コマンド
 
-| 種類 | 入力形式 | 出力形式 |
-|------|----------|----------|
-| **動画** | MP4, AVI, MOV, MKV | MP4 (H.264) |
-| **音声** | MP3, WAV, AAC, M4A, OGG | AAC |
+```bash
+# 開発環境起動（ホットリロード）
+docker-compose -f docker-compose.dev.yml up -d
 
-## 🎯 YouTubeショート仕様
+# ログ確認
+docker-compose logs -f app
 
-| 項目 | 仕様 |
-|------|------|
-| **解像度** | 1080x1920 (9:16) |
-| **最大時間** | 60秒推奨 |
-| **ビットレート** | 8000k |
-| **コーデック** | H.264 + AAC |
+# コンテナ内シェルアクセス
+docker-compose exec app bash
 
-## 📖 使用方法
+# テスト実行
+python test_basic.py
 
-### ショート動画変換
-1. **動画アップロード**: 対応形式の動画ファイルを選択
-2. **トリミング設定**: 必要に応じて開始・終了時間を指定
-3. **拡大倍率調整**: ズーム効果の設定
-4. **テロップ追加**: テキスト、位置、時間、色を設定
-5. **音声追加**: VOICEVOX音声の追加
-6. **BGM設定**: 背景音楽のアップロードと音量調整
-7. **変換実行**: 「ショート動画に変換」ボタンをクリック
-8. **ダウンロード**: 完成した動画をダウンロード
+# コード品質チェック
+ruff check src/
+black src/
+```
 
-### 動画結合
-1. **複数選択**: 結合したい動画ファイルを複数選択
-2. **順序確認**: 選択順序で結合されることを確認
-3. **結合実行**: 「動画を結合」ボタンをクリック
-4. **ダウンロード**: 結合された動画をダウンロード
+### 新機能追加手順
+
+1. **モジュール作成**: 適切な`src/`サブディレクトリに機能を実装
+2. **UIコンポーネント**: `src/ui/components.py`に再利用可能なUI要素を追加
+3. **設定追加**: `src/config/settings.py`で新しい設定項目を定義
+4. **統合**: `app_new.py`でメインアプリケーションに統合
+5. **テスト**: 基本テストとユーザビリティテストを実施
+
+## 🧪 テスト
+
+### 自動テスト
+```bash
+# 基本ヘルスチェック
+python test_basic.py
+
+# または
+bash run_tests.sh
+```
+
+### 手動テスト項目
+- [ ] 各ツールの基本動作
+- [ ] ファイルアップロード・ダウンロード
+- [ ] エラーハンドリング
+- [ ] 大容量ファイル処理
+- [ ] VOICEVOX連携
 
 ## 🔧 トラブルシューティング
 
 ### よくある問題
 
-#### 1. VOICEVOXが動作しない
+**VOICEVOX接続エラー**
 ```bash
-# Docker Composeでコンテナ状況確認
-docker-compose ps
-
-# VOICEVOXコンテナのログ確認
+# VOICEVOXコンテナ状況確認
+docker-compose ps voicevox
 docker-compose logs voicevox
 
-# コンテナ再起動
-docker-compose restart voicevox
+# 手動接続テスト
+curl http://localhost:50021/speakers
 ```
 
-#### 2. 動画変換が失敗する
-- **大きすぎるファイル**: 500MB以下のファイルを使用
-- **対応していない形式**: 対応形式を確認
-- **メモリ不足**: Dockerのメモリ制限を確認
-
-#### 3. フォントが表示されない
+**メモリ不足エラー**
 ```bash
-# フォントファイルの確認
-ls -la fonts/
-ls -la NotoSansCJK-Regular.ttc
+# Docker メモリ上限を増加
+# Docker Desktop > Settings > Resources > Memory
+```
 
+**フォント表示問題**
+```bash
 # コンテナ内フォント確認
-docker-compose exec app fc-list | grep -i noto
+docker-compose exec app ls -la /app/fonts/
 ```
 
-#### 4. ポートが使用中
+**ポート競合**
 ```bash
-# ポート使用状況確認
-lsof -i :8501
-lsof -i :50021
-
-# 別のポートを使用
-docker-compose up -d --env STREAMLIT_PORT=8502
+# 別ポートで起動
+docker-compose up -d -e PORT=8502
 ```
 
-### ログの確認
-```bash
-# アプリケーションログ
-docker-compose logs app
+## 📈 パフォーマンス指標
 
-# VOICEVOX ログ
-docker-compose logs voicevox
+### 処理時間目安
 
-# リアルタイムログ監視
-docker-compose logs -f
-```
+| 操作 | ファイルサイズ | 処理時間 |
+|------|---------------|----------|
+| ショート変換 | 100MB | 1-3分 |
+| 動画結合 | 500MB | 3-8分 |
+| スライド生成 | 20スライド | 2-5分 |
 
-### パフォーマンス最適化
-```bash
-# Dockerリソース使用量確認
-docker stats
+### システム要件
 
-# 不要なコンテナ・イメージの削除
-docker system prune -a
-```
-
-## 🐛 既知の問題
-
-- WSL環境での音声合成に関する制限
-- 大容量動画の処理時間
-- 一部ブラウザでのダウンロード制限
+| 項目 | 最小要件 | 推奨要件 |
+|------|----------|----------|
+| RAM | 4GB | 8GB+ |
+| CPU | 2コア | 4コア+ |
+| ストレージ | 10GB | 50GB+ |
 
 ## 🤝 コントリビューション
 
-1. Forkしてください
-2. 機能ブランチを作成してください (`git checkout -b feature/amazing-feature`)
-3. 変更をコミットしてください (`git commit -m 'Add some amazing feature'`)
-4. ブランチにプッシュしてください (`git push origin feature/amazing-feature`)
-5. Pull Requestを開いてください
+### 開発参加方法
+
+1. **フォーク**: このリポジトリをフォーク
+2. **ブランチ**: `git checkout -b feature/新機能名`
+3. **実装**: モジュラーアーキテクチャに従って開発
+4. **テスト**: 自動テスト＋手動テストを実施
+5. **プルリクエスト**: 詳細な説明と共に提出
+
+### コーディング規約
+- **Python**: PEP 8 + Black フォーマッタ
+- **モジュール**: 単一責任原則に従った分割
+- **ドキュメント**: 関数・クラスにdocstring必須
+- **エラーハンドリング**: 例外処理とユーザーフレンドリーメッセージ
+
+## 📚 バージョン履歴
+
+### v2.0.0 (2025-08-28)
+- **リファクタリング**: モジュラーアーキテクチャに全面改修
+- **UI改善**: サイドバーの簡素化とページ機能追加
+- **保守性向上**: コードの分割と再利用性の向上
+- **テスト強化**: 自動テストとエラーハンドリングの改善
+
+### v1.0.0 (初期版)
+- 基本的なショート動画変換機能
+- VOICEVOX音声合成統合
+- 動画結合機能
+- スライド動画生成機能
 
 ## 📄 ライセンス
 
-このプロジェクトは MIT ライセンスの下で公開されています。
+MIT License - 詳細は[LICENSE](LICENSE)ファイルを参照
 
 ## 🙏 謝辞
 
-- [VOICEVOX](https://voicevox.hiroshiba.jp/) - 音声合成エンジン
-- [Streamlit](https://streamlit.io/) - Webアプリフレームワーク
-- [MoviePy](https://zulko.github.io/moviepy/) - 動画処理ライブラリ
-- [Noto Sans CJK](https://fonts.google.com/noto) - 日本語フォント
+- **VOICEVOX**: 高品質日本語音声合成エンジン
+- **MoviePy**: Python動画処理ライブラリ
+- **Streamlit**: 高速Webアプリケーション開発フレームワーク
+- **FFmpeg**: 包括的動画処理ツール
 
-## 📞 サポート
+---
 
-問題や質問がある場合は、[Issues](../../issues) を作成してください。
+**プロジェクト作成者**: AI Assistant  
+**最終更新**: 2025年8月28日  
+**バージョン**: 2.0.0（リファクタリング版）

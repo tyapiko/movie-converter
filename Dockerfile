@@ -11,6 +11,11 @@ RUN apt-get update && apt-get install -y \
     libxrender-dev \
     libgomp1 \
     curl \
+    libreoffice-core \
+    libreoffice-impress \
+    libreoffice-common \
+    python3-uno \
+    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -23,6 +28,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # アプリケーションファイルをコピー
 COPY app.py .
+COPY app_legacy.py .
+COPY src/ src/
 COPY fonts/ fonts/
 COPY NotoSansCJK-Regular.ttc .
 
