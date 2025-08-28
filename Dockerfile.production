@@ -1,0 +1,81 @@
+# Production Dockerfile for GCP Cloud Run
+FROM python:3.11-slim
+
+# システム依存関係をインストール
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    fonts-noto-cjk \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    curl \
+    libreoffice-core \
+    libreoffice-impress \
+    libreoffice-common \
+    python3-uno \
+    wget \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# VOICEVOX Engine のインストール
+RUN mkdir -p /app/voicevox && \
+    wget -O /tmp/voicevox.tar.gz https://github.com/VOICEVOX/voicevox_engine/releases/download/0.14.4/voicevox_engine-linux-cpu-0.14.4.tar.gz && \
+    tar -xzf /tmp/voicevox.tar.gz -C /app/voicevox --strip-components=1 && \
+    rm /tmp/voicevox.tar.gz
+
+# Python環境のセットアップ
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# アプリケーションファイルをコピー
+COPY app.py .
+COPY app_legacy.py .
+COPY src/ src/
+COPY fonts/ fonts/
+COPY NotoSansCJK-Regular.ttc .
+
+# 非rootユーザーを作成
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app && \
+    mkdir -p /app/tmp && \
+    chown -R appuser:appuser /app/tmp
+USER appuser
+
+# 環境変数
+ENV PORT=8080
+ENV VOICEVOX_URL=http://localhost:50021
+ENV STREAMLIT_SERVER_PORT=8080
+ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
+ENV STREAMLIT_SERVER_HEADLESS=true
+
+# ヘルスチェック
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/_stcore/health || exit 1
+
+# 起動スクリプト作成
+RUN echo '#!/bin/bash\n\
+# VOICEVOX Engine を背景で起動\n\
+cd /app/voicevox && python -m voicevox_engine --host 0.0.0.0 --port 50021 &\n\
+\n\
+# VOICEVOX の起動を待機\n\
+echo "Waiting for VOICEVOX to start..."\n\
+for i in {1..30}; do\n\
+  if curl -s http://localhost:50021/speakers > /dev/null; then\n\
+    echo "VOICEVOX is ready"\n\
+    break\n\
+  fi\n\
+  echo "Waiting... ($i/30)"\n\
+  sleep 2\n\
+done\n\
+\n\
+# Streamlit アプリを起動\n\
+exec streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true\n' > /app/start.sh && \
+    chmod +x /app/start.sh
+
+EXPOSE 8080
+
+CMD ["/app/start.sh"]
