@@ -33,8 +33,11 @@ COPY src/ src/
 COPY fonts/ fonts/
 COPY NotoSansCJK-Regular.ttc .
 
+# tmpディレクトリを作成
+RUN mkdir -p /app/tmp
+
 # 非rootユーザーを作成
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app && chmod 755 /app/tmp
 USER appuser
 
 # Streamlitポートを公開

@@ -10,7 +10,7 @@ This is a **YouTube Shorts Video Converter** - a comprehensive Streamlit web app
 2. **Video Combiner**: Merges multiple video files into a single output
 3. **Slide Video Creator**: Generates videos from PowerPoint presentations with background music and synchronized lyrics
 
-The application runs in Docker containers for consistent deployment across different environments.
+The application has been fully refactored (v2.0) from a monolithic structure to a modular architecture and includes GCP Cloud Run deployment capabilities.
 
 ## Common Commands
 
@@ -43,6 +43,23 @@ curl -f http://localhost:8501/_stcore/health
 curl -f http://localhost:50021/speakers  # VOICEVOX API
 ```
 
+### Code Quality
+```bash
+# Code formatting and linting (if tools are available)
+ruff check src/
+black src/
+```
+
+### GCP Deployment
+```bash
+# Deploy to Google Cloud Run (requires GCP project setup)
+./deploy-gcp.sh YOUR_PROJECT_ID
+
+# Build production Docker images
+docker build -f Dockerfile.cloudrun -t movie-converter:cloudrun .
+docker build -f Dockerfile.production -t movie-converter:production .
+```
+
 ### Local Development (without Docker)
 ```bash
 # Install dependencies
@@ -69,95 +86,85 @@ docker stats
 
 ## Architecture Overview
 
-### Core Components
-- **app.py**: Main Streamlit application with all video processing logic
-- **Docker Services**: 
-  - `app`: Main Streamlit application container
-  - `voicevox`: VOICEVOX voice synthesis engine container
-- **Processing Pipeline**: Upload → Resize → Add Text → Add Voice → Add BGM → Download
+### Modular Architecture (v2.0)
+The application has been refactored from a monolithic 2000+ line file into a clean modular structure:
 
-### Key Processing Functions
-
-#### Video Conversion Functions
-- `resize_video_to_shorts()`: Converts videos to 9:16 format using FFmpeg
-- `add_text_to_video()`: Adds time-based text overlays using PIL/OpenCV
-- `generate_voice_with_voicevox()`: Generates speech using VOICEVOX API
-- `add_multiple_voices_to_video()`: Combines multiple audio tracks
-- `add_bgm_to_video()`: Adds background music with looping
-
-#### Video Processing Functions
-- `combine_videos()`: Concatenates multiple video files
-
-#### Slide Video Functions
-- `extract_slides_from_pptx()`: Extracts text content from PowerPoint slides and generates 9:16 images
-- `create_slide_video()`: Converts slide images to video with BGM and lyrics
-- `add_lyrics_to_video()`: Overlays synchronized lyrics on video frames
-
-### Dependencies
-- **Video Processing**: MoviePy, OpenCV, FFmpeg
-- **UI Framework**: Streamlit  
-- **Voice Synthesis**: VOICEVOX (external container)
-- **Image Processing**: PIL (Pillow)
-- **PowerPoint Processing**: python-pptx
-- **Japanese Font Support**: NotoSansCJK fonts
-- **HTTP Requests**: requests
-
-### File Structure
 ```
-/app/
-├── app.py                    # Main application
-├── requirements.txt          # Python dependencies
-├── fonts/                    # Japanese font files
-│   └── NotoSansJP-Regular.ttf
-├── tmp/                      # Temporary processing files
-└── NotoSansCJK-Regular.ttc   # CJK font file
+src/
+├── audio/              # VOICEVOX voice synthesis integration
+│   └── voicevox.py     # VoiceVoxClient class with connection handling
+├── config/             # Application configuration
+│   └── settings.py     # Centralized settings, constants, and environment variables
+├── ui/                 # Reusable UI components
+│   └── components.py   # UIComponents class with Streamlit UI elements
+├── utils/              # Utility functions
+│   └── file_utils.py   # File handling, validation, and temporary file management
+└── video/              # Video processing core
+    ├── processor.py    # VideoProcessor class for resizing, BGM, combining
+    └── text_overlay.py # TextOverlay class for telops and slide video creation
 ```
+
+### Key Architecture Patterns
+
+#### Modular Design
+- **Single Responsibility**: Each module handles one specific domain
+- **Dependency Injection**: Configuration and dependencies passed through constructors
+- **Clean Interfaces**: Well-defined APIs between modules
+
+#### Application Flow
+1. **Main App** (`app.py`): Routes tool selection and coordinates UI components
+2. **UI Components** (`src/ui/components.py`): Renders forms, file uploaders, settings panels
+3. **Processing Classes**: Handle video manipulation, text overlay, and audio synthesis
+4. **Configuration**: Centralized settings for paths, URLs, and application constants
+
+#### Legacy Support
+- **app_legacy.py**: Original monolithic version kept for compatibility
+- **Gradual Migration**: New features use modular architecture, existing functions preserved
+
+### Core Processing Pipeline
+1. **File Upload & Validation**: File type checking and temporary storage
+2. **Video Processing**: Resize/convert using VideoProcessor class
+3. **Text & Audio Addition**: TextOverlay and VoiceVoxClient integration  
+4. **Final Composition**: Combining all elements with proper resource cleanup
+5. **Download Delivery**: Secure file delivery with automatic cleanup
+
+### Deployment Architecture
+- **Local Development**: Docker Compose with separate app/voicevox containers
+- **Production (GCP)**: Cloud Run deployment with integrated or external VOICEVOX
+- **Multi-Environment**: Different Dockerfiles for different deployment scenarios
 
 ### Environment Configuration
 - **VOICEVOX_URL**: Connection URL for VOICEVOX service (default: http://voicevox:50021)
 - **Docker Networks**: Isolated networking between app and voicevox containers
 - **Volume Mounts**: ./tmp:/app/tmp for temporary file sharing
+- **GCP Settings**: PROJECT_ID, CLOUD_STORAGE_BUCKET for production deployment
 
 ## Development Patterns
 
-### Error Handling
-- Graceful degradation for VOICEVOX failures (continues without voice)
-- Comprehensive cleanup of temporary files in try/finally blocks
-- User-friendly error messages with specific guidance
+### Adding New Features
+1. **Create Module**: Add new functionality in appropriate `src/` subdirectory
+2. **UI Components**: Add reusable UI elements to `src/ui/components.py`
+3. **Configuration**: Define new settings in `src/config/settings.py`  
+4. **Integration**: Wire into main app through `app.py` tool routing
+5. **Testing**: Add basic tests and manual validation
 
-### State Management  
-- Streamlit session state for managing telops/voices lists
-- Temporary file handling with proper cleanup
-- Progress bars for long-running operations
+### Error Handling Philosophy
+- **Graceful Degradation**: VOICEVOX failures don't break core functionality
+- **Resource Cleanup**: Always use try/finally blocks for temporary files and video clips
+- **User-Friendly Messages**: Clear error explanations with actionable guidance
+- **Logging**: Important events and errors logged for debugging
 
-### Processing Workflows
+### State Management Strategy
+- **Session State**: Streamlit session_state for UI lists (telops, lyrics, voices)
+- **Temporary Files**: Secure creation with automatic cleanup on completion/error
+- **Progress Indicators**: Long operations show progress bars with status messages
+- **Memory Management**: Explicit cleanup of MoviePy clips to prevent memory leaks
 
-#### Video Conversion Workflow
-1. **Input Validation**: File type and size checks
-2. **Temporary Storage**: Secure temporary file creation
-3. **Sequential Processing**: Resize → Text → Voice → BGM 
-4. **Resource Cleanup**: Proper disposal of video clips and audio files
-5. **Download Delivery**: Final file download with appropriate naming
-
-#### Video Combination Workflow
-1. **Multi-file Upload**: Accept multiple video files
-2. **Validation**: Check file integrity and format compatibility
-3. **Sequential Concatenation**: Merge videos in upload order
-4. **Output Generation**: Single combined video file
-
-#### Slide Video Creation Workflow
-1. **PowerPoint Processing**: Extract slide content using python-pptx
-2. **Image Generation**: Create 9:16 slide images with text rendering
-3. **Duration Configuration**: Individual slide timing setup
-4. **Lyrics Integration**: Time-synchronized text overlay
-5. **BGM Synchronization**: Background music with looping
-6. **Video Composition**: Combine slides, audio, and lyrics into final video
-
-### Voice Synthesis Integration
-- Multi-environment VOICEVOX URL detection (Docker/WSL/localhost)
-- Async voice generation with proper error handling  
-- Multiple voice track composition with timing controls
-- Volume balancing between original audio and synthesized voice
+### VOICEVOX Integration Pattern
+- **Multi-Environment Detection**: Tries multiple URLs (Docker/localhost/WSL)
+- **Connection Resilience**: Falls back gracefully when VOICEVOX unavailable
+- **API Abstraction**: VoiceVoxClient class encapsulates all VOICEVOX interactions
+- **Error Recovery**: Continues processing even if voice synthesis fails
 
 ## Important Considerations
 

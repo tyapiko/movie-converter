@@ -126,54 +126,115 @@ class TextOverlay:
             bool: Success status
         """
         try:
-            from moviepy import ImageSequenceClip, AudioFileClip
+            from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
+            import os
+            
+            print(f"DEBUG: Creating slide video with {len(slides_data)} slides")
             
             # Create slide images
-            slide_paths = []
+            slide_clips = []
             total_duration = 0
             
             for i, slide in enumerate(slides_data):
                 duration = slide.get('duration', 3.0)
                 slide_image_path = create_temp_file(suffix=f"_slide_{i}.png")
                 
+                print(f"DEBUG: Processing slide {i+1} with duration {duration}s")
+                
                 # Create slide image
                 self._create_slide_image(slide, slide_image_path)
-                slide_paths.append(slide_image_path)
+                
+                # Verify image was created
+                if not os.path.exists(slide_image_path):
+                    print(f"ERROR: Slide image not created: {slide_image_path}")
+                    continue
+                
+                # Create video clip from image
+                slide_clip = ImageClip(slide_image_path, duration=duration)
+                slide_clips.append(slide_clip)
                 total_duration += duration
+                
+                print(f"DEBUG: Created clip for slide {i+1}, total duration: {total_duration}s")
             
-            # Create video from slides
-            durations = [slide.get('duration', 3.0) for slide in slides_data]
-            slide_clip = ImageSequenceClip(slide_paths, durations=durations)
+            if not slide_clips:
+                print("ERROR: No slide clips created")
+                return False
+            
+            print(f"DEBUG: Concatenating {len(slide_clips)} slide clips")
+            
+            # Concatenate all slide clips
+            final_clip = concatenate_videoclips(slide_clips, method="compose")
+            
+            print(f"DEBUG: Loading BGM from: {bgm_path}")
             
             # Add BGM
             bgm_clip = AudioFileClip(bgm_path)
-            if bgm_clip.duration < total_duration:
-                loops_needed = int(total_duration / bgm_clip.duration) + 1
-                bgm_clip = bgm_clip.loop(loops_needed).subclip(0, total_duration)
-            else:
-                bgm_clip = bgm_clip.subclip(0, total_duration)
+            print(f"DEBUG: BGM duration: {bgm_clip.duration}s, Video duration: {total_duration}s")
             
-            slide_clip = slide_clip.set_audio(bgm_clip)
+            if bgm_clip.duration < total_duration:
+                # Loop BGM if it's shorter than video
+                loops_needed = int(total_duration / bgm_clip.duration) + 1
+                bgm_clip = bgm_clip.loop(loops_needed).subclipped(0, total_duration)
+                print(f"DEBUG: Looped BGM {loops_needed} times")
+            else:
+                # Trim BGM if it's longer than video
+                bgm_clip = bgm_clip.subclipped(0, total_duration)
+                print(f"DEBUG: Trimmed BGM to {total_duration}s")
+            
+            final_clip = final_clip.with_audio(bgm_clip)
             
             # Add lyrics if provided
-            if lyrics_data:
-                slide_clip = self._add_lyrics_to_video(slide_clip, lyrics_data)
+            if lyrics_data and len(lyrics_data) > 0:
+                print(f"DEBUG: Adding {len(lyrics_data)} lyrics")
+                final_clip = self._add_lyrics_to_video(final_clip, lyrics_data)
             
-            # Write video
-            slide_clip.write_videofile(output_path, codec='libx264', audio_codec='aac')
+            print(f"DEBUG: Writing video to: {output_path}")
+            
+            # Create temp audio file in proper temp directory
+            temp_audio_path = create_temp_file(suffix="_audio.m4a")
+            
+            # Write video with better settings
+            final_clip.write_videofile(
+                output_path, 
+                codec='libx264', 
+                audio_codec='aac',
+                temp_audiofile=temp_audio_path,
+                remove_temp=True,
+                fps=24,
+                preset='medium'
+            )
+            
+            print("DEBUG: Video creation completed successfully")
             
             # Clean up
-            slide_clip.close()
+            for clip in slide_clips:
+                clip.close()
+            final_clip.close()
             bgm_clip.close()
             
             return True
             
         except Exception as e:
-            print(f"Slide video creation error: {str(e)}")
+            print(f"ERROR: Slide video creation failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def _create_slide_image(self, slide_data: Dict[str, Any], output_path: str) -> None:
         """Create an image from slide data."""
+        import shutil
+        
+        # If slide already has an image_path (from PowerPoint conversion), use it
+        if 'image_path' in slide_data and slide_data['image_path']:
+            try:
+                # Copy the existing PNG image to the output path
+                shutil.copy2(slide_data['image_path'], output_path)
+                print(f"DEBUG: Using existing slide image: {slide_data['image_path']}")
+                return
+            except Exception as e:
+                print(f"DEBUG: Failed to copy slide image, creating fallback: {e}")
+        
+        # Fallback: Create image from text (legacy method)
         from src.config import DEFAULT_VIDEO_WIDTH, DEFAULT_VIDEO_HEIGHT
         
         # Create blank image

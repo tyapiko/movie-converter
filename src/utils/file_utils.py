@@ -7,8 +7,18 @@ from typing import Optional
 from src.config import TEMP_DIR
 
 def ensure_temp_dir() -> None:
-    """Ensure temporary directory exists."""
-    os.makedirs(TEMP_DIR, exist_ok=True)
+    """Ensure temporary directory exists with proper permissions."""
+    global TEMP_DIR
+    os.makedirs(TEMP_DIR, mode=0o755, exist_ok=True)
+    # Ensure the directory is writable by the current user
+    if not os.access(TEMP_DIR, os.W_OK):
+        try:
+            os.chmod(TEMP_DIR, 0o755)
+        except PermissionError:
+            # If we can't change permissions, try using system temp
+            import tempfile
+            TEMP_DIR = tempfile.gettempdir()
+            os.makedirs(TEMP_DIR, mode=0o755, exist_ok=True)
 
 def create_temp_file(suffix: str = "") -> str:
     """Create a temporary file and return its path."""

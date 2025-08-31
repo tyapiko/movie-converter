@@ -27,8 +27,11 @@ RUN pip install --no-cache-dir \
     jupyter \
     ipython
 
+# tmpディレクトリを作成
+RUN mkdir -p /app/tmp
+
 # 非rootユーザーを作成
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app && chmod 755 /app/tmp
 USER appuser
 
 # ポートを公開
