@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(/C:\\Users\\k3m3y\\Desktop\\movie-converter/**)",
+      "Read(/C:\\Users\\k3m3y\\Desktop\\movie-converter/**)",
+      "Read(/C:\\Users\\k3m3y\\Desktop\\movie-converter/**)",
+      "Read(/C:\\Users\\k3m3y\\Desktop\\movie-converter/**)",
+      "Read(/C:\\Users\\k3m3y\\Desktop\\movie-converter/**)",
+      "Read(/C:\\Users\\k3m3y\\Desktop\\movie-converter/**)",
+      "Read(/C:\\Users\\k3m3y\\Desktop\\movie-converter/**)",
+      "Bash(docker-compose:*)",
+      "Read(/C:\\Users\\k3m3y\\Desktop\\movie-converter/**)",
+      "Read(/C:\\Users\\k3m3y\\Desktop\\movie-converter/**)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -11,8 +11,15 @@ RUN apt-get update && apt-get install -y \
     libxrender-dev \
     libgomp1 \
     curl \
+    libreoffice \
+    imagemagick \
+    ghostscript \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
+
+# ImageMagickのPDFポリシーを修正
+RUN find /etc -name "policy.xml" -exec sed -i 's/<policy domain="coder" rights="none" pattern="PDF" \/>/<policy domain="coder" rights="read|write" pattern="PDF" \/>/g' {} \; || true
 
 # 作業ディレクトリを設定
 WORKDIR /app
@@ -37,5 +44,5 @@ EXPOSE 8501
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8501/_stcore/health || exit 1
 
-# Streamlitアプリを起動
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
+# Streamlitアプリを起動（ファイル監視とホットリロード有効）
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", "--server.runOnSave=true", "--server.fileWatcherType=watchdog"]

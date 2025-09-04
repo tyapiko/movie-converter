@@ -5,6 +5,8 @@ from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip, concatenat
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import cv2
+from pptx import Presentation
+import io
 
 # ✅ 実験完了: GitHub Actionsが構文エラーを正常に検出しました
 
@@ -18,49 +20,22 @@ st.set_page_config(
 st.sidebar.title("🛠️ ツール選択")
 tool = st.sidebar.radio(
     "使用するツール",
-    ["ショート動画変換", "動画結合"]
+    ["ショート動画変換", "動画結合", "パワポナレーション動画"]
 )
 
 if tool == "ショート動画変換":
     st.title("🎬 ショート動画コンバーター")
     st.markdown("動画をアップロードして、YouTubeショート向けの縦型動画に変換しましょう！")
-else:
+elif tool == "動画結合":
     st.title("🔗 動画結合ツール")
     st.markdown("複数のショート動画を選択して、長時間動画に結合しましょう！")
+else:  # パワポナレーション動画
+    st.title("📊 パワポナレーション動画")
+    st.markdown("PowerPointファイルをアップロードして、ノート部分を読み上げる動画を作成しましょう！")
 
-def resize_video_to_shorts(video_path, output_path, scale_factor=1.0, start_time=None, end_time=None):
-    """動画をYouTubeショート形式(9:16)にリサイズ（全体表示、パディング付き）"""
+def resize_video_to_shorts(video_path, output_path, scale_factor=1.0, start_time=None, end_time=None, keep_original_size=False):
+    """動画をYouTubeショート形式(9:16)にリサイズ、または元のサイズを維持"""
     import subprocess
-    
-    # 元の動画情報を取得
-    clip = VideoFileClip(video_path)
-    original_width, original_height = clip.size
-    original_ratio = original_width / original_height
-    clip.close()
-    
-    # YouTubeショートの推奨解像度: 1080x1920 (9:16)
-    target_width = 1080
-    target_height = 1920
-    target_ratio = target_width / target_height
-    
-    # 基本スケール計算（ターゲット枠に収まるサイズ）
-    if original_ratio > target_ratio:
-        # 横長の場合、幅をターゲット幅に合わせる
-        base_width = target_width
-        base_height = int(target_width / original_ratio)
-    else:
-        # 縦長の場合、高さをターゲット高さに合わせる
-        base_height = target_height
-        base_width = int(target_height * original_ratio)
-    
-    # scale_factorを適用（拡大倍率による調整）
-    final_width = int(base_width * scale_factor)
-    final_height = int(base_height * scale_factor)
-    
-    # 拡大倍率が1.0より大きい場合、動画がターゲットフレームからはみ出すのは正常
-    # パディングエラーを避けるため、最小サイズは1ピクセル以上を保証
-    final_width = max(1, final_width)
-    final_height = max(1, final_height)
     
     # FFmpegコマンドで動画変換
     ffmpeg_cmd = ['ffmpeg', '-i', video_path]
@@ -68,17 +43,51 @@ def resize_video_to_shorts(video_path, output_path, scale_factor=1.0, start_time
     # トリミングが指定されている場合
     if start_time is not None and end_time is not None:
         ffmpeg_cmd.extend(['-ss', str(start_time), '-t', str(end_time - start_time)])
-    
-    # ビデオフィルターを構築
-    if scale_factor > 1.0:
-        # 拡大時：スケール→中央クロップ→パディング
-        vf = f'scale={final_width}:{final_height},crop={min(final_width, target_width)}:{min(final_height, target_height)},pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2:black'
-    else:
-        # 縮小時：スケール→パディング
-        vf = f'scale={final_width}:{final_height},pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2:black'
+
+    if not keep_original_size:
+        # 元の動画情報を取得
+        clip = VideoFileClip(video_path)
+        original_width, original_height = clip.size
+        original_ratio = original_width / original_height
+        clip.close()
+        
+        # YouTubeショートの推奨解像度: 1080x1920 (9:16)
+        target_width = 1080
+        target_height = 1920
+        target_ratio = target_width / target_height
+        
+        # 基本スケール計算（ターゲット枠に収まるサイズ）
+        if original_ratio > target_ratio:
+            # 横長の場合、幅をターゲット幅に合わせる
+            base_width = target_width
+            base_height = int(target_width / original_ratio)
+        else:
+            # 縦長の場合、高さをターゲット高さに合わせる
+            base_height = target_height
+            base_width = int(target_height * original_ratio)
+        
+        # scale_factorを適用（拡大倍率による調整）
+        final_width = int(base_width * scale_factor)
+        final_height = int(base_height * scale_factor)
+        
+        # 拡大倍率が1.0より大きい場合、動画がターゲットフレームからはみ出すのは正常
+        # パディングエラーを避けるため、最小サイズは1ピクセル以上を保証
+        final_width = max(1, final_width)
+        final_height = max(1, final_height)
+        
+        # ビデオフィルターを構築
+        if scale_factor > 1.0:
+            # 拡大時：スケール→中央クロップ→パディング
+            vf = f'scale={final_width}:{final_height},crop={min(final_width, target_width)}:{min(final_height, target_height)},pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2:black'
+        else:
+            # 縮小時：スケール→パディング
+            vf = f'scale={final_width}:{final_height},pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2:black'
+        
+        ffmpeg_cmd.extend([
+            '-vf', vf
+        ])
     
     ffmpeg_cmd.extend([
-        '-vf', vf,
         '-c:v', 'libx264',
         '-c:a', 'aac',
         '-b:v', '8000k',
@@ -451,6 +460,224 @@ def add_text_to_video(video_path, output_path, telops, font_size=60):
     
     return output_path
 
+def extract_slides_and_notes(pptx_file):
+    """PowerPointファイルからスライドと speaker notes を抽出"""
+    presentation = Presentation(pptx_file)
+    slides_data = []
+    
+    for i, slide in enumerate(presentation.slides):
+        # スライドを画像として保存
+        slide_image_path = tempfile.mktemp(suffix=f'_slide_{i}.png')
+        
+        # スライドの画像を取得するため、まずPILで空の画像を作成
+        # 注意: python-pptxはスライドの直接的な画像変換をサポートしていないため、
+        # ここではスライドのテキスト内容とノートのみを抽出します
+        
+        # スライドのテキスト内容を取得
+        slide_text = ""
+        for shape in slide.shapes:
+            if hasattr(shape, "text"):
+                slide_text += shape.text + " "
+        
+        # スピーカーノートを取得
+        notes_slide = slide.notes_slide
+        notes_text = ""
+        if notes_slide:
+            notes_text_frame = notes_slide.notes_text_frame
+            if notes_text_frame:
+                notes_text = notes_text_frame.text
+        
+        slides_data.append({
+            'slide_number': i + 1,
+            'slide_text': slide_text.strip(),
+            'notes_text': notes_text.strip(),
+            'slide_image_path': None  # 実際の画像抽出は別の方法で実装
+        })
+    
+    return slides_data
+
+def create_slide_images_from_pptx(pptx_file):
+    """PowerPointスライドを画像ファイルに変換する（LibreOfficeを使用）"""
+    import subprocess
+    import shutil
+    
+    # 一時ディレクトリを作成
+    temp_dir = tempfile.mkdtemp()
+    pptx_path = os.path.join(temp_dir, "presentation.pptx")
+    
+    # アップロードファイルを保存
+    with open(pptx_path, 'wb') as f:
+        pptx_file.seek(0)
+        f.write(pptx_file.read())
+    
+    try:
+        # LibreOfficeでPDFに変換
+        cmd = [
+            'libreoffice', 
+            '--headless', 
+            '--convert-to', 'pdf',
+            '--outdir', temp_dir,
+            pptx_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        
+        if result.returncode != 0:
+            raise Exception(f"LibreOffice変換エラー: {result.stderr}")
+        
+        # PDFをPNG画像に変換（pdftoppmを使用 - より安定）
+        pdf_path = os.path.join(temp_dir, "presentation.pdf")
+        if not os.path.exists(pdf_path):
+            raise Exception("PDF変換に失敗しました")
+        
+        # pdftoppmでPDFの各ページをPNGに変換
+        cmd = [
+            'pdftoppm',
+            '-png',
+            '-r', '150',  # 解像度150dpi
+            pdf_path,
+            os.path.join(temp_dir, 'slide')
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        
+        if result.returncode != 0:
+            # pdftoppmが失敗した場合はImageMagickを試行
+            cmd = [
+                'convert',
+                '-density', '150',
+                '-background', 'white',
+                '-alpha', 'remove',
+                '-quality', '90',
+                pdf_path,
+                os.path.join(temp_dir, 'slide-%03d.png')
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            
+            if result.returncode != 0:
+                raise Exception(f"画像変換エラー: {result.stderr}")
+        
+        # 生成された画像ファイルパスを取得
+        slide_images = []
+        
+        # pdftoppmの出力形式に対応
+        for file in sorted(os.listdir(temp_dir)):
+            if file.startswith('slide') and file.endswith('.png'):
+                image_path = os.path.join(temp_dir, file)
+                if os.path.exists(image_path):
+                    # 永続的な場所にコピー
+                    slide_num = len(slide_images)
+                    permanent_path = tempfile.mktemp(suffix=f'_slide_{slide_num}.png')
+                    shutil.copy(image_path, permanent_path)
+                    slide_images.append(permanent_path)
+        
+        if not slide_images:
+            raise Exception("スライド画像の生成に失敗しました")
+        
+        return slide_images, temp_dir
+        
+    except subprocess.TimeoutExpired:
+        raise Exception("変換処理がタイムアウトしました")
+    except Exception as e:
+        # 一時ディレクトリをクリーンアップ
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise e
+
+def create_slide_video_with_narration(slide_image_path, narration_audio_path, duration, output_path):
+    """スライド画像とナレーション音声から動画を作成"""
+    from moviepy import ImageClip
+    
+    # スライド画像から動画クリップを作成
+    slide_clip = ImageClip(slide_image_path, duration=duration)
+    
+    # 音声を読み込み
+    audio = AudioFileClip(narration_audio_path)
+    
+    # 画像クリップに音声を追加
+    final_clip = slide_clip.with_audio(audio)
+    
+    # 出力
+    final_clip.write_videofile(
+        output_path,
+        codec='libx264',
+        audio_codec='aac',
+        fps=1,  # スライドなので低いFPSで十分
+        ffmpeg_params=['-crf', '18', '-preset', 'fast']
+    )
+    
+    # クリーンアップ
+    slide_clip.close()
+    audio.close()
+    final_clip.close()
+    
+    return output_path
+
+def create_text_slide_image(text, title, width=1920, height=1080):
+    """テキストからスライド画像を生成"""
+    # 空の画像を作成
+    img = Image.new('RGB', (width, height), color='white')
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        # 日本語フォントを読み込み
+        title_font = ImageFont.truetype("NotoSansCJK-Regular.ttc", 72)
+        text_font = ImageFont.truetype("NotoSansCJK-Regular.ttc", 48)
+    except:
+        try:
+            title_font = ImageFont.load_default(size=72)
+            text_font = ImageFont.load_default(size=48)
+        except:
+            title_font = ImageFont.load_default()
+            text_font = ImageFont.load_default()
+    
+    # タイトルを描画
+    title_bbox = draw.textbbox((0, 0), title, font=title_font)
+    title_width = title_bbox[2] - title_bbox[0]
+    title_x = (width - title_width) // 2
+    draw.text((title_x, 100), title, fill='black', font=title_font)
+    
+    # テキストを描画（改行対応）
+    lines = text.split('\n')
+    y_offset = 250
+    line_height = 60
+    
+    for line in lines:
+        if not line.strip():
+            continue
+        
+        # 長い行を自動改行
+        words = line.split()
+        current_line = ""
+        
+        for word in words:
+            test_line = current_line + word + " "
+            bbox = draw.textbbox((0, 0), test_line, font=text_font)
+            test_width = bbox[2] - bbox[0]
+            
+            if test_width > width - 200:  # マージンを考慮
+                if current_line:
+                    # 現在の行を描画
+                    text_bbox = draw.textbbox((0, 0), current_line, font=text_font)
+                    text_width = text_bbox[2] - text_bbox[0]
+                    text_x = (width - text_width) // 2
+                    draw.text((text_x, y_offset), current_line, fill='black', font=text_font)
+                    y_offset += line_height
+                current_line = word + " "
+            else:
+                current_line = test_line
+        
+        # 残りのテキストを描画
+        if current_line.strip():
+            text_bbox = draw.textbbox((0, 0), current_line, font=text_font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_x = (width - text_width) // 2
+            draw.text((text_x, y_offset), current_line, fill='black', font=text_font)
+            y_offset += line_height
+    
+    # 画像を保存
+    output_path = tempfile.mktemp(suffix='.png')
+    img.save(output_path)
+    
+    return output_path
+
 def combine_videos(video_paths, output_path):
     """複数の動画を結合する"""
     clips = []
@@ -496,12 +723,18 @@ if tool == "ショート動画変換":
         type=['mp4', 'avi', 'mov', 'mkv'],
         help="MP4, AVI, MOV, MKV形式の動画ファイルをサポートしています"
     )
-else:
+elif tool == "動画結合":
     uploaded_files = st.file_uploader(
         "結合する動画ファイルを複数選択してください",
         type=['mp4', 'avi', 'mov', 'mkv'],
         accept_multiple_files=True,
         help="MP4, AVI, MOV, MKV形式の動画ファイルをサポートしています"
+    )
+else:  # パワポナレーション動画
+    uploaded_pptx = st.file_uploader(
+        "PowerPointファイルをアップロードしてください",
+        type=['pptx', 'ppt'],
+        help="PowerPoint形式のファイル（.pptx, .ppt）をサポートしています"
     )
 
 if tool == "ショート動画変換" and uploaded_file is not None:
@@ -558,24 +791,28 @@ if tool == "ショート動画変換" and uploaded_file is not None:
             else:
                 st.error("終了時間は開始時間より後に設定してください")
         
-        # スケール倍率設定
         st.subheader("📏 拡大倍率設定")
-        scale_factor = st.slider(
-            "動画の拡大倍率",
-            min_value=0.5,
-            max_value=5.0,
-            value=1.0,
-            step=0.1,
-            help="1.0 = 原寸大、3.0 = 300%拡大。大きくするほどズームインされます。"
-        )
+        keep_original_size = st.checkbox("元の動画サイズを維持する", help="チェックすると、動画は9:16にリサイズされず、元の解像度のまま処理されます。")
         
-        # 倍率の説明表示
-        if scale_factor < 1.0:
-            st.info(f"📉 縮小表示: {scale_factor*100:.0f}% (より多くの映像が見えます)")
-        elif scale_factor == 1.0:
-            st.info("📊 原寸大表示: 100% (元の動画のまま)")
+        if not keep_original_size:
+            scale_factor = st.slider(
+                "動画の拡大倍率",
+                min_value=0.5,
+                max_value=5.0,
+                value=1.0,
+                step=0.1,
+                help="1.0 = 原寸大、3.0 = 300%拡大。大きくするほどズームインされます。"
+            )
+            
+            # 倍率の説明表示
+            if scale_factor < 1.0:
+                st.info(f"📉 縮小表示: {scale_factor*100:.0f}% (より多くの映像が見えます)")
+            elif scale_factor == 1.0:
+                st.info("📊 原寸大表示: 100% (元の動画のまま)")
+            else:
+                st.info(f"📈 拡大表示: {scale_factor*100:.0f}% (ズームイン効果)")
         else:
-            st.info(f"📈 拡大表示: {scale_factor*100:.0f}% (ズームイン効果)")
+            scale_factor = 1.0 # 元のサイズを維持する場合はスケールは1.0固定
         
         # テキストオーバーレイ設定
         add_text = st.checkbox("テキストを追加する")
@@ -792,7 +1029,7 @@ if tool == "ショート動画変換" and uploaded_file is not None:
                 trim_start = start_time if trim_video else None
                 trim_end = end_time if trim_video else None
                 
-                resize_video_to_shorts(input_video_path, resized_video_path, scale_factor, trim_start, trim_end)
+                resize_video_to_shorts(input_video_path, resized_video_path, scale_factor, trim_start, trim_end, keep_original_size)
                 progress_bar.progress(40)
                 
                 # Step 2: テキストを追加（オプション）
@@ -1021,6 +1258,190 @@ elif tool == "動画結合" and uploaded_files:
                     except:
                         pass
 
+elif tool == "パワポナレーション動画" and uploaded_pptx is not None:
+    try:
+        # PowerPointファイルからスライドとノートを抽出
+        with st.spinner("PowerPointファイルを解析中..."):
+            slides_data = extract_slides_and_notes(uploaded_pptx)
+        
+        if not slides_data:
+            st.error("❌ スライドが見つかりませんでした。")
+        else:
+            st.success(f"✅ {len(slides_data)}枚のスライドが見つかりました。")
+            
+            # スライド情報を表示
+            st.subheader("📋 抽出されたスライド情報")
+            
+            for i, slide in enumerate(slides_data):
+                with st.expander(f"スライド {slide['slide_number']}: {slide['slide_text'][:50]}..."):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("**スライド内容:**")
+                        st.text_area("", value=slide['slide_text'], height=100, key=f"slide_text_{i}", disabled=True)
+                    
+                    with col2:
+                        st.markdown("**ノート（読み上げ内容）:**")
+                        if slide['notes_text']:
+                            st.text_area("", value=slide['notes_text'], height=100, key=f"notes_text_{i}", disabled=True)
+                        else:
+                            st.info("ノートが設定されていません")
+            
+            # 設定オプション
+            st.subheader("🎛️ 動画設定")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                slide_duration = st.slider(
+                    "各スライドの表示時間（秒）",
+                    min_value=3,
+                    max_value=30,
+                    value=10,
+                    help="ノートがある場合は音声の長さに自動調整されます"
+                )
+            
+            with col2:
+                voice_speed = st.slider(
+                    "読み上げ速度",
+                    min_value=0.5,
+                    max_value=2.0,
+                    value=1.0,
+                    step=0.1,
+                    help="音声の読み上げ速度を調整します"
+                )
+            
+            # 変換ボタン
+            if st.button("ナレーション動画を作成", type="primary"):
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                try:
+                    # Step 1: PowerPointスライドを画像に変換
+                    status_text.text("スライドを画像に変換中...")
+                    progress_bar.progress(10)
+                    
+                    # PowerPointファイルから実際のスライド画像を抽出
+                    try:
+                        slide_image_paths, temp_conversion_dir = create_slide_images_from_pptx(uploaded_pptx)
+                        use_real_slides = True
+                        st.info(f"✅ {len(slide_image_paths)}枚のスライド画像を抽出しました")
+                    except Exception as e:
+                        st.warning(f"⚠️ スライド画像の抽出に失敗しました。テキストベースのスライドを使用します: {str(e)}")
+                        slide_image_paths = []
+                        use_real_slides = False
+                    
+                    slide_videos = []
+                    temp_files = []
+                    
+                    for i, slide in enumerate(slides_data):
+                        progress = 10 + (i / len(slides_data)) * 80
+                        progress_bar.progress(int(progress))
+                        status_text.text(f"スライド {i+1}/{len(slides_data)} を処理中...")
+                        
+                        # スライド画像を取得（実際のスライドまたはテキストベース）
+                        if use_real_slides and i < len(slide_image_paths):
+                            slide_image_path = slide_image_paths[i]
+                        else:
+                            # フォールバック: テキストベースのスライド生成
+                            slide_image_path = create_text_slide_image(
+                                slide['slide_text'], 
+                                f"スライド {slide['slide_number']}"
+                            )
+                            temp_files.append(slide_image_path)
+                        
+                        # ナレーション音声を生成（ノートがある場合）
+                        if slide['notes_text'].strip():
+                            try:
+                                voice_path = generate_voice_with_voicevox(slide['notes_text'])
+                                temp_files.append(voice_path)
+                                
+                                # 音声の長さを取得
+                                audio_clip = AudioFileClip(voice_path)
+                                duration = max(audio_clip.duration, 3)  # 最低3秒
+                                audio_clip.close()
+                                
+                            except Exception as e:
+                                st.warning(f"⚠️ スライド{i+1}の音声生成に失敗: {str(e)}")
+                                voice_path = None
+                                duration = slide_duration
+                        else:
+                            voice_path = None
+                            duration = slide_duration
+                        
+                        # スライド動画を作成
+                        slide_video_path = tempfile.mktemp(suffix=f'_slide_video_{i}.mp4')
+                        temp_files.append(slide_video_path)
+                        
+                        if voice_path:
+                            create_slide_video_with_narration(slide_image_path, voice_path, duration, slide_video_path)
+                        else:
+                            # 音声なしの場合
+                            from moviepy import ImageClip
+                            clip = ImageClip(slide_image_path, duration=duration)
+                            clip.write_videofile(
+                                slide_video_path,
+                                codec='libx264',
+                                fps=1,
+                                ffmpeg_params=['-crf', '18', '-preset', 'fast']
+                            )
+                            clip.close()
+                        
+                        slide_videos.append(slide_video_path)
+                    
+                    # Step 2: 全スライド動画を結合
+                    status_text.text("動画を結合中...")
+                    progress_bar.progress(90)
+                    
+                    final_output_path = tempfile.mktemp(suffix='_presentation_video.mp4')
+                    temp_files.append(final_output_path)
+                    
+                    combine_videos(slide_videos, final_output_path)
+                    
+                    progress_bar.progress(100)
+                    status_text.text("変換完了！")
+                    
+                    # プレビュー表示
+                    st.subheader("📹 作成されたナレーション動画")
+                    st.video(final_output_path, width=600)
+                    
+                    # ダウンロードボタンを表示
+                    with open(final_output_path, 'rb') as file:
+                        st.download_button(
+                            label="📱 ナレーション動画をダウンロード",
+                            data=file.read(),
+                            file_name=f"presentation_{uploaded_pptx.name.split('.')[0]}.mp4",
+                            mime="video/mp4"
+                        )
+                    
+                    st.success("✅ 動画変換が完了しました！ダウンロードボタンをクリックして保存してください。")
+                    
+                except Exception as e:
+                    st.error(f"❌ エラーが発生しました: {str(e)}")
+                finally:
+                    # 一時ファイルをクリーンアップ
+                    for temp_file in temp_files:
+                        try:
+                            os.unlink(temp_file)
+                        except:
+                            pass
+                    
+                    # スライド画像の一時ファイルもクリーンアップ
+                    if use_real_slides:
+                        for slide_image in slide_image_paths:
+                            try:
+                                os.unlink(slide_image)
+                            except:
+                                pass
+                        try:
+                            import shutil
+                            shutil.rmtree(temp_conversion_dir, ignore_errors=True)
+                        except:
+                            pass
+    
+    except Exception as e:
+        st.error(f"❌ PowerPointファイルの解析に失敗しました: {str(e)}")
+
 # 使用方法の説明
 if tool == "ショート動画変換":
     st.sidebar.header("📖 使用方法")
@@ -1034,7 +1455,7 @@ if tool == "ショート動画変換":
     - 解像度: 1080x1920 (9:16)
     - 最大時間: 60秒
     """)
-else:
+elif tool == "動画結合":
     st.sidebar.header("📖 使用方法")
     st.sidebar.markdown("""
     1. **動画を複数選択**: MP4、AVI、MOV、MKV形式の動画ファイルを2つ以上選択
@@ -1045,22 +1466,47 @@ else:
     - 動画は選択した順番で結合されます
     - 異なる解像度の動画も結合可能です
     """)
+else:  # パワポナレーション動画
+    st.sidebar.header("📖 使用方法")
+    st.sidebar.markdown("""
+    1. **PowerPointファイルをアップロード**: .pptx, .ppt形式のファイルを選択
+    2. **スライド確認**: 抽出されたスライド内容とノートを確認
+    3. **設定調整**: スライド表示時間と読み上げ速度を調整
+    4. **変換実行**: 「ナレーション動画を作成」ボタンをクリック
+    5. **ダウンロード**: 完成した動画をダウンロード
+    
+    **重要**:
+    - スピーカーノートが読み上げられます
+    - ノートがないスライドは設定時間で表示されます
+    """)
 
 st.sidebar.header("ℹ️ 対応形式")
-st.sidebar.markdown("""
-**動画入力形式**:
-- MP4
-- AVI
-- MOV
-- MKV
+if tool == "ショート動画変換" or tool == "動画結合":
+    st.sidebar.markdown("""
+    **動画入力形式**:
+    - MP4
+    - AVI
+    - MOV
+    - MKV
 
-**BGM入力形式**:
-- MP3
-- WAV
-- AAC
-- M4A
-- OGG
+    **BGM入力形式**:
+    - MP3
+    - WAV
+    - AAC
+    - M4A
+    - OGG
 
-**出力形式**:
-- MP4 (H.264)
-""")
+    **出力形式**:
+    - MP4 (H.264)
+    """)
+else:  # パワポナレーション動画
+    st.sidebar.markdown("""
+    **PowerPoint入力形式**:
+    - PPTX
+    - PPT
+
+    **出力形式**:
+    - MP4 (H.264)
+    - 解像度: 1920x1080 (16:9)
+    - 音声: AAC (VOICEVOX)
+    """)

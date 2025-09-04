@@ -9,6 +9,10 @@ services:
     environment:
       - VOICEVOX_URL=http://voicevox:50021
     volumes:
+      - ./app.py:/app/app.py  # アプリケーションファイルをマウント（ホットリロード対応）
+      - ./requirements.txt:/app/requirements.txt  # 依存関係ファイル
+      - ./fonts:/app/fonts  # フォントフォルダ
+      - ./NotoSansCJK-Regular.ttc:/app/NotoSansCJK-Regular.ttc  # フォントファイル
       - ./tmp:/app/tmp  # 一時ファイル用
     depends_on:
       - voicevox
