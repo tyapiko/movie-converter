@@ -24,7 +24,7 @@ tool = st.sidebar.radio(
 )
 
 if tool == "ショート動画変換":
-    st.title("🎬 ショート動画コンバーター")
+    st.title("🎬 ショート動画コンバーター8")
     st.markdown("動画をアップロードして、YouTubeショート向けの縦型動画に変換しましょう！")
 elif tool == "動画結合":
     st.title("🔗 動画結合ツール")
@@ -182,79 +182,86 @@ def generate_voice_with_voicevox(text, speaker_id=10, output_path=None):
         raise Exception(f"音声生成に失敗しました: {str(e)}")
 
 def add_multiple_voices_to_video(video_path, output_path, voices, original_volume=1.0):
-    """動画に複数の音声を追加"""
-    clip = VideoFileClip(video_path)
+    """動画に複数の音声を追加（FFmpeg直接実行版）"""
+    import subprocess
+    import tempfile
     
-    # 元の音声を取得
-    audio_clips = []
-    if clip.audio is not None:
-        original_audio = clip.audio
-        if original_volume != 1.0:
-            original_audio = original_audio.with_volume_scaled(original_volume)
-        audio_clips.append(original_audio)
+    print(f"DEBUG: FFmpeg直接実行版で音声追加開始")
     
-    # 各音声を生成して追加
     temp_voice_files = []
     try:
+        # VOICEVOX音声を生成
+        voice_files = []
         for voice in voices:
             try:
-                # 音声を生成
                 voice_path = generate_voice_with_voicevox(voice['text'])
                 temp_voice_files.append(voice_path)
-                
-                # 音声ファイルを読み込み
-                voice_audio = AudioFileClip(voice_path)
-                
-                # 音量を調整
-                if voice['volume'] != 1.0:
-                    voice_audio = voice_audio.with_volume_scaled(voice['volume'])
-                
-                # 開始時間を設定（指定時間から再生開始）
-                if voice['start_time'] > 0.0:
-                    voice_audio = voice_audio.with_start(voice['start_time'])
-                
-                audio_clips.append(voice_audio)
-                
+                voice_files.append({
+                    'path': voice_path,
+                    'start_time': voice['start_time'],
+                    'volume': voice['volume']
+                })
             except Exception as e:
                 st.warning(f"⚠️ 音声「{voice['text'][:20]}...」の生成をスキップしました: {str(e)}")
                 continue
         
-        # 全ての音声を合成
-        if len(audio_clips) > 1:
-            final_audio = CompositeAudioClip(audio_clips)
-        elif len(audio_clips) == 1:
-            final_audio = audio_clips[0]
+        if not voice_files:
+            # 音声追加がない場合は元動画をそのままコピー
+            import shutil
+            shutil.copy2(video_path, output_path)
+            return output_path
+        
+        # FFmpegコマンドを構築（動画ストリームはコピー、音声のみ処理）
+        ffmpeg_cmd = ['ffmpeg', '-i', video_path, '-y']
+        
+        # 各音声ファイルを入力として追加
+        for voice_file in voice_files:
+            ffmpeg_cmd.extend(['-i', voice_file['path']])
+        
+        # フィルター構築（シンプルに音声をミックス）
+        if len(voice_files) == 1:
+            # 1つの音声のみ
+            voice = voice_files[0]
+            delay_samples = int(voice['start_time'] * 44100)  # 44.1kHz想定
+            if delay_samples > 0:
+                audio_filter = f'[1:a]volume={voice["volume"]},adelay={delay_samples}[voice];[0:a][voice]amix=inputs=2:duration=first[audio]'
+            else:
+                audio_filter = f'[1:a]volume={voice["volume"]}[voice];[0:a][voice]amix=inputs=2:duration=first[audio]'
         else:
-            final_audio = None
+            # 複数音声をミックス
+            voice_filters = []
+            for i, voice in enumerate(voice_files):
+                delay_samples = int(voice['start_time'] * 44100)
+                if delay_samples > 0:
+                    voice_filters.append(f'[{i+1}:a]volume={voice["volume"]},adelay={delay_samples}[voice{i}]')
+                else:
+                    voice_filters.append(f'[{i+1}:a]volume={voice["volume"]}[voice{i}]')
+            
+            # 全音声をミックス
+            voice_labels = ''.join(f'[voice{i}]' for i in range(len(voice_files)))
+            audio_filter = ';'.join(voice_filters) + f';[0:a]{voice_labels}amix=inputs={len(voice_files)+1}:duration=first[audio]'
         
-        # 動画に音声を設定
-        if final_audio is not None:
-            final_clip = clip.with_audio(final_audio)
-        else:
-            final_clip = clip
+        # 動画ストリームはコピー、音声のみ処理
+        ffmpeg_cmd.extend([
+            '-filter_complex', audio_filter,
+            '-map', '0:v',  # 動画ストリームはそのままコピー
+            '-map', '[audio]',  # 処理された音声
+            '-c:v', 'copy',  # 動画は再エンコードしない（重要！）
+            '-c:a', 'aac',
+            output_path
+        ])
         
-        # 出力
-        final_clip.write_videofile(
-            output_path,
-            codec='libx264',
-            audio_codec='aac',
-            bitrate='8000k',
-            ffmpeg_params=['-crf', '18', '-preset', 'slow']
-        )
+        print(f"DEBUG: FFmpeg実行: {' '.join(ffmpeg_cmd)}")
+        result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
         
-        # リソースをクリーンアップ
-        clip.close()
-        final_clip.close()
-        if final_audio is not None:
-            final_audio.close()
-        for audio in audio_clips:
-            try:
-                audio.close()
-            except:
-                pass
-                
+        if result.returncode != 0:
+            print(f"DEBUG: FFmpeg エラー: {result.stderr}")
+            raise Exception(f"FFmpeg処理に失敗しました: {result.stderr}")
+        
+        print(f"DEBUG: FFmpeg成功")
+        
     finally:
-        # 一時音声ファイルを削除
+        # 一時ファイル削除
         for temp_file in temp_voice_files:
             try:
                 os.unlink(temp_file)
@@ -263,12 +270,89 @@ def add_multiple_voices_to_video(video_path, output_path, voices, original_volum
     
     return output_path
 
+
 def add_bgm_to_video(video_path, output_path, bgm_path=None, bgm_volume=0.5, original_volume=1.0, loop_bgm=True, bgm_start_time=0.0):
-    """動画にBGMを追加"""
+    """動画にBGMを追加（FFmpegを使用してより正確に）"""
+    import subprocess
+    import tempfile
+    
+    print(f"DEBUG BGM: FFmpeg方式でBGM追加開始")
+    
+    # 元の動画の情報を取得
     clip = VideoFileClip(video_path)
+    original_video_duration = clip.duration
+    original_fps = clip.fps
+    print(f"DEBUG BGM: 元の動画 - 長さ: {original_video_duration}秒, FPS: {original_fps}")
+    clip.close()
     
     if bgm_path and os.path.exists(bgm_path):
-        # BGMを読み込み
+        try:
+            # FFmpegでBGMを追加
+            bgm_info = AudioFileClip(bgm_path)
+            bgm_duration = bgm_info.duration
+            bgm_info.close()
+            
+            ffmpeg_cmd = ['ffmpeg', '-i', video_path, '-i', bgm_path, '-y']
+            
+            # フィルター構築
+            filter_parts = []
+            
+            # 動画トラック
+            filter_parts.append('[0:v]copy[video]')
+            
+            # BGM処理
+            if loop_bgm and bgm_duration < original_video_duration:
+                # ループが必要な場合
+                loops_needed = int(original_video_duration / bgm_duration) + 1
+                filter_parts.append(f'[1:a]stream_loop={loops_needed},atrim=0:{original_video_duration},volume={bgm_volume}[bgm]')
+            else:
+                # ループ不要またはBGMが十分長い場合
+                filter_parts.append(f'[1:a]atrim=0:{original_video_duration},volume={bgm_volume}[bgm]')
+            
+            # BGMの開始時間調整
+            if bgm_start_time > 0.0:
+                delay_ms = int(bgm_start_time * 1000)
+                filter_parts[-1] = f'[1:a]atrim=0:{original_video_duration},adelay={delay_ms}|{delay_ms},volume={bgm_volume}[bgm]'
+            
+            # 元の音声がある場合はミックス
+            if VideoFileClip(video_path).audio is not None:
+                filter_parts.append(f'[0:a]volume={original_volume}[orig]')
+                filter_parts.append('[orig][bgm]amix=inputs=2:duration=first[audio]')
+            else:
+                filter_parts.append('[bgm]acopy[audio]')
+            
+            # フィルターグラフを完成
+            filter_complex = ';'.join(filter_parts)
+            ffmpeg_cmd.extend([
+                '-filter_complex', filter_complex,
+                '-map', '[video]',
+                '-map', '[audio]',
+                '-t', str(original_video_duration),
+                '-r', str(original_fps),
+                '-c:v', 'libx264',
+                '-c:a', 'aac',
+                '-crf', '18',
+                '-preset', 'slow',
+                output_path
+            ])
+            
+            print(f"DEBUG BGM: FFmpeg実行: {' '.join(ffmpeg_cmd)}")
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                print(f"DEBUG BGM: FFmpeg成功")
+                return output_path
+            else:
+                print(f"DEBUG BGM: FFmpeg エラー: {result.stderr}")
+                # フォールバック処理へ続行
+                
+        except Exception as e:
+            print(f"DEBUG BGM: FFmpeg方式失敗: {str(e)}")
+            # フォールバック処理へ続行
+        
+        # フォールバック：MoviePy方式
+        print("DEBUG BGM: MoviePyフォールバック方式を使用")
+        clip = VideoFileClip(video_path)
         bgm = AudioFileClip(bgm_path)
         
         # BGMの音量を調整
@@ -277,7 +361,7 @@ def add_bgm_to_video(video_path, output_path, bgm_path=None, bgm_volume=0.5, ori
             bgm = bgm.with_volume_scaled(bgm_volume)
         
         # BGMをループ再生するかどうか
-        if loop_bgm and bgm.duration < clip.duration:
+        if loop_bgm and bgm.duration < original_video_duration:
             # BGMをループして動画の長さに合わせる
             loops_needed = int(clip.duration / bgm.duration) + 1
             try:
@@ -337,18 +421,29 @@ def add_bgm_to_video(video_path, output_path, bgm_path=None, bgm_volume=0.5, ori
             else:
                 final_audio = None
         
-        # 動画に音声を設定
+        # 動画に音声を設定（フレームレートを維持）
         if final_audio is not None:
-            final_clip = clip.with_audio(final_audio)
+            # 音声の長さを動画の長さに合わせる
+            if final_audio.duration > original_video_duration:
+                final_audio = final_audio.subclipped(0, original_video_duration)
+            elif final_audio.duration < original_video_duration:
+                final_audio = final_audio.with_duration(original_video_duration)
+            
+            # 重要：元の動画のFPSを保持
+            final_clip = clip.with_audio(final_audio).with_fps(original_fps)
         else:
-            final_clip = clip
+            final_clip = clip.with_fps(original_fps)
         
-        # 出力
+        # 動画の長さを確実に設定
+        final_clip = final_clip.with_duration(original_video_duration)
+        
+        # 出力（元のFPSを明示的に指定）
         final_clip.write_videofile(
             output_path,
             codec='libx264',
             audio_codec='aac',
             bitrate='8000k',
+            fps=original_fps,  # 重要：元のFPSを明示的に指定
             ffmpeg_params=['-crf', '18', '-preset', 'slow']
         )
         
@@ -360,15 +455,19 @@ def add_bgm_to_video(video_path, output_path, bgm_path=None, bgm_volume=0.5, ori
             original_audio.close()
         final_audio.close()
     else:
-        # BGMがない場合は元の動画をそのままコピー
-        clip.write_videofile(
+        # BGMがない場合は元の動画をそのままコピー（FPSを保持）
+        clip = VideoFileClip(video_path)
+        final_clip = clip.with_fps(original_fps).with_duration(original_video_duration)
+        final_clip.write_videofile(
             output_path,
             codec='libx264',
             audio_codec='aac',
             bitrate='8000k',
+            fps=original_fps,
             ffmpeg_params=['-crf', '18', '-preset', 'slow']
         )
         clip.close()
+        final_clip.close()
     
     return output_path
 
