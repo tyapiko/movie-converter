@@ -222,18 +222,18 @@ def add_multiple_voices_to_video(video_path, output_path, voices, original_volum
         if len(voice_files) == 1:
             # 1つの音声のみ
             voice = voice_files[0]
-            delay_samples = int(voice['start_time'] * 44100)  # 44.1kHz想定
-            if delay_samples > 0:
-                audio_filter = f'[1:a]volume={voice["volume"]},adelay={delay_samples}[voice];[0:a][voice]amix=inputs=2:duration=first[audio]'
+            delay_ms = int(voice['start_time'] * 1000)  # ミリ秒に変換
+            if delay_ms > 0:
+                audio_filter = f'[1:a]volume={voice["volume"]},adelay={delay_ms}[voice];[0:a][voice]amix=inputs=2:duration=first[audio]'
             else:
                 audio_filter = f'[1:a]volume={voice["volume"]}[voice];[0:a][voice]amix=inputs=2:duration=first[audio]'
         else:
             # 複数音声をミックス
             voice_filters = []
             for i, voice in enumerate(voice_files):
-                delay_samples = int(voice['start_time'] * 44100)
-                if delay_samples > 0:
-                    voice_filters.append(f'[{i+1}:a]volume={voice["volume"]},adelay={delay_samples}[voice{i}]')
+                delay_ms = int(voice['start_time'] * 1000)  # ミリ秒に変換
+                if delay_ms > 0:
+                    voice_filters.append(f'[{i+1}:a]volume={voice["volume"]},adelay={delay_ms}[voice{i}]')
                 else:
                     voice_filters.append(f'[{i+1}:a]volume={voice["volume"]}[voice{i}]')
             
